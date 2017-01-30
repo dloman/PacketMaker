@@ -2,6 +2,24 @@
 #include <PacketMaker.hpp>
 #include <boost/hana.hpp>
 
+struct Thingy
+{
+  BOOST_HANA_DEFINE_STRUCT(
+    Thingy
+    );
+
+  std::string Encode()
+  {
+    std::cout << "W00t Encode" << std::endl;
+
+    return "stuff";
+  }
+
+  void Decode(std::string& bytes)
+  {
+    std::cout << "W00t Decode\n" << bytes << std::endl;
+  }
+};
 
 struct Packet
 {
@@ -9,7 +27,8 @@ struct Packet
     Packet,
     (uint8_t, Byte0),
     (uint8_t, Byte1),
-    (uint8_t, Byte2)
+    (uint8_t, Byte2),
+    (Thingy, thingy)
     );
 };
 

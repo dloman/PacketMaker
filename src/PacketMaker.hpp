@@ -1,4 +1,5 @@
 #pragma once
+#include "FunctionObject.hpp"
 #include <boost/hana/fwd/members.hpp>
 #include <boost/hana/for_each.hpp>
 #include <boost/hana/at_key.hpp>
@@ -9,20 +10,33 @@
 
 namespace pm
 {
+  namespace hana = boost::hana;
   //----------------------------------------------------------------------------
   //----------------------------------------------------------------------------
   template<typename T>
-  std::string Encode(T object)
+  std::string Encode(const T& object)
   {
     std::string bytes;
 
     auto serialize = [](std::string& output, auto const& object)
     {
-      boost::hana::for_each(
-        boost::hana::members(object),
+      auto hasEncode =
+        hana::is_valid([](auto&& object) -> decltype(object.Encode()){});
+
+      hana::for_each(
+        hana::members(object),
         [&](auto member)
         {
-          output.append(reinterpret_cast<char*>(&member), sizeof(member));
+          hana::if_(hasEncode(member),
+            [&output](auto& member)
+            {
+              output += member.Encode();
+            },
+            [&output](auto& member)
+            {
+              output.append(reinterpret_cast<char*>(&member), sizeof(member));
+            }
+            )(member);
         });
     };
 
@@ -34,7 +48,7 @@ namespace pm
   //----------------------------------------------------------------------------
   //----------------------------------------------------------------------------
   template<typename T>
-  void Decode(T& member, std::string& bytes, const auto& object)
+  void DecodeImpl(T& member, std::string& bytes)
   {
     std::memcpy(&member, bytes.data(), sizeof(member));
 
@@ -47,16 +61,37 @@ namespace pm
   //----------------------------------------------------------------------------
   //----------------------------------------------------------------------------
   template<typename T>
+  void Decode(T& member, std::string& bytes)
+  {
+    auto hasDecode =
+      hana::is_valid([&bytes](auto&& member) ->decltype(member.Decode(bytes)){});
+
+    return hana::if_(hasDecode(member),
+      [&bytes](auto& member)
+      {
+        std::cout << "decode sucess" << std::endl;
+        member.Decode(bytes);
+      },
+      [&bytes](auto& member)
+      {
+        DecodeImpl(member, bytes);
+      }
+      )(member);
+  }
+
+  //----------------------------------------------------------------------------
+  //----------------------------------------------------------------------------
+  template<typename T>
   T Decode(std::string bytes)
   {
     auto Decoder =
       [](std::string bytes, auto& object)
       {
-        boost::hana::for_each(boost::hana::keys(object), [&](auto&& Key)
+        hana::for_each(hana::keys(object), [&](auto&& key)
           {
-            auto& Member = boost::hana::at_key(object, Key);
+            auto& Member = hana::at_key(object, key);
 
-            Decode(Member, bytes, object);
+            Decode(Member, bytes);
           });
       };
 
