@@ -2,22 +2,22 @@
 #include <PacketMaker.hpp>
 #include <boost/hana.hpp>
 
-struct Thingy
+struct Thingy : public pm::FunctionObject
 {
   BOOST_HANA_DEFINE_STRUCT(
     Thingy
     );
 
-  std::string Encode()
+  std::string Encode() override
   {
     std::cout << "W00t Encode" << std::endl;
 
     return "stuff";
   }
 
-  void Decode(std::string& bytes)
+  void Decode(std::string& bytes) override
   {
-    std::cout << "W00t Decode\n" << bytes << std::endl;
+    std::cout << "W00t Decode" << std::endl;
   }
 };
 

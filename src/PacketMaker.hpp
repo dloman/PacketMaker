@@ -26,7 +26,7 @@ namespace pm
 
       auto isChild =
         hana::is_valid([](auto&& object) ->
-          std::enable_if_t<std::is_base_of<pm::FunctionObject, decltype(object)>::value> {});
+          std::enable_if_t<std::is_base_of<pm::FunctionObject, std::decay_t<decltype(object)>>::value> {});
 
       hana::for_each(
         hana::members(object),
@@ -74,7 +74,6 @@ namespace pm
     return hana::if_(hasDecode(member),
       [&bytes](auto& member)
       {
-        std::cout << "decode sucess" << std::endl;
         member.Decode(bytes);
       },
       [&bytes](auto& member)
