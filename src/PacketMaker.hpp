@@ -7,6 +7,7 @@
 #include <boost/type_index.hpp>
 #include <cstring>
 #include <functional>
+#include <type_traits>
 
 namespace pm
 {
@@ -23,11 +24,15 @@ namespace pm
       auto hasEncode =
         hana::is_valid([](auto&& object) -> decltype(object.Encode()){});
 
+      auto isChild =
+        hana::is_valid([](auto&& object) ->
+          std::enable_if_t<std::is_base_of<pm::FunctionObject, decltype(object)>::value> {});
+
       hana::for_each(
         hana::members(object),
         [&](auto member)
         {
-          hana::if_(hasEncode(member),
+          hana::if_(hasEncode(member) && isChild(member),
             [&output](auto& member)
             {
               output += member.Encode();
