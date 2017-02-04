@@ -1,5 +1,5 @@
 #pragma once
-#include "FunctionObject.hpp"
+#include <FunctionObjects/FunctionObject.hpp>
 #include <boost/hana/fwd/members.hpp>
 #include <boost/hana/for_each.hpp>
 #include <boost/hana/at_key.hpp>
@@ -21,25 +21,41 @@ namespace pm
 
     auto serialize = [](std::string& output, auto const& object)
     {
-      auto hasEncode =
-        hana::is_valid([](auto&& object) -> decltype(object.Encode()){});
+      auto isHanaStruct =
+        hana::is_valid([](auto&& object) ->
+          std::enable_if_t<hana::Struct<std::decay_t<decltype(object)>>::value> {});
 
       auto isChild =
         hana::is_valid([](auto&& object) ->
-          std::enable_if_t<std::is_base_of<pm::FunctionObject, std::decay_t<decltype(object)>>::value> {});
+          std::enable_if_t<std::is_base_of<
+            pm::FunctionObject,
+            std::decay_t<decltype(object)>>::value> {});
 
       hana::for_each(
         hana::members(object),
         [&](auto member)
         {
-          hana::if_(hasEncode(member) && isChild(member),
+          hana::if_(isHanaStruct(member),
             [&output](auto& member)
             {
-              output += member.Encode();
+              auto temp = pm::Encode(member);
+
+              output += temp;
             },
-            [&output](auto& member)
+            [&](auto& member)
             {
-              output.append(reinterpret_cast<char*>(&member), sizeof(member));
+              hana::if_(isChild(member),
+                [&output](auto& member)
+                {
+                  auto temp =  member.Encode(output);
+
+                  output.append(reinterpret_cast<char*>(&temp), sizeof(temp));
+                },
+                [&output](auto& member)
+                {
+                  output.append(reinterpret_cast<char*>(&member), sizeof(member));
+                }
+                )(member);
             }
             )(member);
         });
@@ -86,16 +102,29 @@ namespace pm
   //----------------------------------------------------------------------------
   //----------------------------------------------------------------------------
   template<typename T>
-  T Decode(std::string bytes)
+  T Decode(std::string& bytes)
   {
+    auto isHanaStruct =
+      hana::is_valid([](auto&& object) ->
+        std::enable_if_t<hana::Struct<std::decay_t<decltype(object)>>::value> {});
+
     auto Decoder =
-      [](std::string bytes, auto& object)
+      [&isHanaStruct](std::string& bytes, auto& object)
       {
         hana::for_each(hana::keys(object), [&](auto&& key)
           {
-            auto& Member = hana::at_key(object, key);
+            auto& member = hana::at_key(object, key);
 
-            Decode(Member, bytes);
+            hana::if_(isHanaStruct(member),
+              [&bytes](auto& member)
+              {
+                member = pm::Decode<std::decay_t<decltype(member)>>(bytes);
+              },
+              [&bytes](auto& member)
+              {
+                Decode(member, bytes);
+              }
+              )(member);
           });
       };
 
