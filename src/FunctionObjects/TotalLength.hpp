@@ -42,7 +42,6 @@ namespace pm
         return mTotalLength == Rhs.mTotalLength;
       }
 
-
     private:
 
       T mTotalLength;

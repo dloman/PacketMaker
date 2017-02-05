@@ -21,6 +21,11 @@ namespace pm
       void Decode(std::string& bytes)
       {
         std::memcpy(&mCurrentLength, bytes.data(), sizeof(mCurrentLength));
+
+        if (bytes.size() > sizeof(mCurrentLength))
+        {
+          bytes = bytes.substr(sizeof(mCurrentLength));
+        }
       }
 
       //------------------------------------------------------------------------
