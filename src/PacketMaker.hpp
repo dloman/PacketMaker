@@ -1,5 +1,6 @@
 #pragma once
 #include <FunctionObjects/FunctionObject.hpp>
+#include <FunctionObjects/DelayedEvaluation.hpp>
 #include <boost/hana/fwd/members.hpp>
 #include <boost/hana/for_each.hpp>
 #include <boost/hana/at_key.hpp>
@@ -8,6 +9,7 @@
 #include <cstring>
 #include <functional>
 #include <type_traits>
+#include <vector>
 
 namespace pm
 {
@@ -15,17 +17,25 @@ namespace pm
   //----------------------------------------------------------------------------
   //----------------------------------------------------------------------------
   template<typename T>
-  std::string Encode(const T& object)
+  std::string Encode(
+    const T& object,
+    std::vector<std::function<void(std::string&)>>& delayedFunctionObjects)
   {
     std::string bytes;
 
-    auto serialize = [](std::string& output, auto const& object)
+    auto serialize = [&delayedFunctionObjects](std::string& output, auto const& object)
     {
       auto isHanaStruct =
         hana::is_valid([](auto&& object) ->
           std::enable_if_t<hana::Struct<std::decay_t<decltype(object)>>::value> {});
 
-      auto isChild =
+      auto isDelayedEvaluation =
+        hana::is_valid([](auto&& object) ->
+          std::enable_if_t<std::is_base_of<
+            pm::DelayedEvaluation,
+            std::decay_t<decltype(object)>>::value> {});
+
+      auto isFunctionObject =
         hana::is_valid([](auto&& object) ->
           std::enable_if_t<std::is_base_of<
             pm::FunctionObject,
@@ -36,20 +46,46 @@ namespace pm
         [&](auto member)
         {
           hana::if_(isHanaStruct(member),
-            [&output](auto& member)
+            [&](auto& member)
             {
-              auto temp = pm::Encode(member);
+              auto temp = pm::Encode(member, delayedFunctionObjects);
 
               output += temp;
             },
             [&](auto& member)
             {
-              hana::if_(isChild(member),
-                [&output](auto& member)
+              hana::if_(isFunctionObject(member),
+                [&output, &isDelayedEvaluation, &delayedFunctionObjects](auto& member)
                 {
-                  auto temp =  member.Encode(output);
+                  hana::if_(isDelayedEvaluation(member),
+                    [&output, &delayedFunctionObjects](auto& member)
+                    {
+                      auto index = output.size();
 
-                  output.append(reinterpret_cast<char*>(&temp), sizeof(temp));
+                      //append placeholder data
+                      decltype(member.Encode(std::string{})) temp;
+
+                      output.append(reinterpret_cast<char*>(&temp), sizeof(temp));
+
+                      delayedFunctionObjects.push_back(
+                        [index, &member] (std::string& output)
+                        {
+                          auto temp = member.Encode(output);
+
+                          output.replace(
+                            index,
+                            sizeof(temp),
+                            reinterpret_cast<char*>(&temp),
+                            sizeof(temp));
+                        });
+                    },
+                    [&output](auto& member)
+                    {
+                      auto temp =  member.Encode(output);
+
+                      output.append(reinterpret_cast<char*>(&temp), sizeof(temp));
+                    }
+                    )(member);
                 },
                 [&output](auto& member)
                 {
@@ -63,8 +99,24 @@ namespace pm
 
     serialize(bytes, object);
 
+    for (const auto& delayedFunctionObject : delayedFunctionObjects)
+    {
+      delayedFunctionObject(bytes);
+    }
+
     return bytes;
   }
+
+  //----------------------------------------------------------------------------
+  //----------------------------------------------------------------------------
+  template<typename T>
+  std::string Encode(const T& object)
+  {
+    static std::vector<std::function<void(std::string&)>> delayedFunctionObjects;
+
+    return Encode(object, delayedFunctionObjects);
+  }
+
 
   //----------------------------------------------------------------------------
   //----------------------------------------------------------------------------

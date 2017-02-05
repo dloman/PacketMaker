@@ -1,6 +1,7 @@
 #include <iostream>
 #include <PacketMaker.hpp>
 #include <FunctionObjects/CurrentLength.hpp>
+#include <FunctionObjects/TotalLength.hpp>
 #include <boost/hana.hpp>
 
 struct Header
@@ -8,7 +9,8 @@ struct Header
   BOOST_HANA_DEFINE_STRUCT(
     Header,
     (uint8_t, Byte0),
-    (uint8_t, Byte1)
+    (uint8_t, Byte1),
+    (pm::TotalLength<uint32_t>, TotalLength)
     );
 };
 
@@ -39,11 +41,12 @@ int main(int argc, const char** argv)
 
   std::cout
     << "NewPacket"
-    << " Header.Byte0 = " << +NewPacket.header.Byte0
-    << " Header.Byte1 = " << +NewPacket.header.Byte1
-    << " Byte0 = " << +NewPacket.Byte0
-    << " Byte1 = " << +NewPacket.Byte1
-    << " Byte2 = " << +NewPacket.Byte2
+    << " Header.Byte0 = " << +NewPacket.header.Byte0 << '\n'
+    << " Header.Byte1 = " << +NewPacket.header.Byte1 << '\n'
+    << " Header.TotalLength = " << +NewPacket.header.TotalLength.GetTotalLength() << '\n'
+    << " Byte0 = " << +NewPacket.Byte0 << '\n'
+    << " Byte1 = " << +NewPacket.Byte1 << '\n'
+    << " Byte2 = " << +NewPacket.Byte2 << '\n'
     << " Length = " << +NewPacket.Length.GetCurrentLength() << std::endl;
 
   //BOOST_HANA_RUNTIME_CHECK(

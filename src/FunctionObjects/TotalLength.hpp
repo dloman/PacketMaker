@@ -3,7 +3,7 @@
 namespace pm
 {
   template<typename T>
-  class CurrentLength : pm::FunctionObject
+  class TotalLength : pm::DelayedEvaluation
   {
     public:
 
@@ -11,34 +11,40 @@ namespace pm
       //------------------------------------------------------------------------
       T Encode(const std::string& stream)
       {
-        mCurrentLength = static_cast<T>(stream.size() + sizeof(mCurrentLength));
+        mTotalLength = static_cast<T>(stream.size());
 
-        return mCurrentLength;
+        return mTotalLength;
       }
 
       //------------------------------------------------------------------------
       //------------------------------------------------------------------------
       void Decode(std::string& bytes)
       {
-        std::memcpy(&mCurrentLength, bytes.data(), sizeof(mCurrentLength));
+        std::memcpy(&mTotalLength, bytes.data(), sizeof(mTotalLength));
+
+        if (bytes.size() > sizeof(mTotalLength))
+        {
+          bytes = bytes.substr(sizeof(mTotalLength));
+        }
       }
 
       //------------------------------------------------------------------------
       //------------------------------------------------------------------------
-      T GetCurrentLength()
+      T GetTotalLength()
       {
-        return mCurrentLength;
+        return mTotalLength;
       }
 
       //------------------------------------------------------------------------
       //------------------------------------------------------------------------
-      bool operator = (const CurrentLength<T>& Rhs)
+      bool operator == (const TotalLength<T>& Rhs)
       {
-        return mCurrentLength == Rhs.mCurrentLength;
+        return mTotalLength == Rhs.mTotalLength;
       }
+
 
     private:
 
-      T mCurrentLength;
+      T mTotalLength;
   };
 }
